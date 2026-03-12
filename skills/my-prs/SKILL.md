@@ -1,6 +1,6 @@
 ---
 name: my-prs
-description: List PRs requiring my attention - where I'm personally requested as reviewer (not via team) or mentioned in unresolved comments. Excludes merged PRs.
+description: List PRs requiring my attention - where I'm personally requested as reviewer (not via team), mentioned in unresolved comments, or my own PRs with unresolved comments. Excludes merged PRs.
 allowed-tools: Bash
 ---
 
@@ -52,7 +52,31 @@ If no argument is provided, default to **1 week**.
    gh search prs --mentions <USERNAME> --created ">=<ONE_WEEK_AGO>" --state open --limit 100
    ```
 
-4. For any PRs found via mentions, check for **unresolved** review threads mentioning the user using GraphQL:
+4. Search for open PRs authored by me that have unresolved review comments:
+   ```bash
+   gh api graphql -f query='
+   {
+     search(query: "is:pr is:open author:<USERNAME> created:>=<ONE_WEEK_AGO>", type: ISSUE, first: 100) {
+       nodes {
+         ... on PullRequest {
+           number
+           title
+           url
+           repository { nameWithOwner }
+           createdAt
+           reviewThreads(first: 100) {
+             nodes {
+               isResolved
+             }
+           }
+         }
+       }
+     }
+   }'
+   ```
+   Filter the results: only include PRs that have at least one review thread where `isResolved` is `false`.
+
+5. For any PRs found via mentions, check for **unresolved** review threads mentioning the user using GraphQL:
    ```bash
    gh api graphql -f query='
    {
@@ -72,7 +96,7 @@ If no argument is provided, default to **1 week**.
    ```
    Only include PRs that have at least one **unresolved** thread where the user's `@username` appears in a comment body.
 
-5. Present results as a table with columns: Repo, PR #, Title, Reason (personal review request / mentioned in unresolved comment).
+6. Present results as a table with columns: Repo, PR #, Title, Reason (personal review request / mentioned in unresolved comment / my PR with unresolved comments). Deduplicate PRs that appear in multiple searches — show the most specific reason.
 
 ## Date Calculation
 
